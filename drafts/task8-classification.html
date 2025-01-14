@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Drag and Drop with Clone on Mobile</title>
+  <style>
+    .draggable-item {
+      width: 60px;
+      height: 30px;
+      background-color: #cce;
+      margin: 5px;
+      text-align: center;
+      line-height: 30px;
+      border: 1px solid #999;
+      user-select: none; /* Для предотвращения выделения текста при таче */
+    }
+
+    .dropzone {
+      width: 150px;
+      min-height: 100px;
+      border: 2px dashed #ccc;
+      margin: 10px;
+      padding: 10px;
+    }
+
+    .correct {
+      background-color: #cfc !important;
+    }
+
+    .incorrect {
+      background-color: #fcc !important;
+    }
+
+    #message-classification {
+      display: none;
+      margin-top: 20px;
+      font-size: 18px;
+      color: green;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<div style="display: flex;">
+  <div id="divContainer" style="margin-right: 30px;"></div>
+
+  <!-- Зоны для сброса -->
+  <div id="relative-links" class="dropzone" ondragover="allowDrop(event)" ondrop="drop(event)">
+    Relative
+  </div>
+  <div id="absolute-links" class="dropzone" ondragover="allowDrop(event)" ondrop="drop(event)">
+    Absolute
+  </div>
+  <div id="mixed-links" class="dropzone" ondragover="allowDrop(event)" ondrop="drop(event)">
+    Mixed
+  </div>
+</div>
+
+<p id="message-classification">Все элементы на своих местах!</p>
+
+<script>
+  // Массив всех элементов с их "правильной" категорией
+  const itemsData = [
+    { id: "a1r",  label: "A1",   category: "relative-links" },
+    { id: "c1r",  label: "C1",   category: "relative-links" },
+    { id: "a11a", label: "$A$1", category: "absolute-links" },
+    { id: "c11a", label: "$C$1", category: "absolute-links" },
+    { id: "aa1m", label: "$A1",  category: "mixed-links" },
+    { id: "a11m", label: "A$1",  category: "mixed-links" },
+    { id: "cc1m", label: "$C1",  category: "mixed-links" },
+    { id: "c11m", label: "C$1",  category: "mixed-links" },
+  ];
+  
+  // Общее количество элементов
+  const totalItems = itemsData.length;
+
+  // Текущее количество элементов, стоящих в правильной категории
+  let correctCount = 0;
+
+  // Функция для перемешивания массива (Fisher–Yates shuffle)
+  function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+  }
+
+  // Перемешиваем элементы
+  shuffle(itemsData);
+
+  // Создаем блоки в случайном порядке в divContainer
+  const divContainer = document.getElementById("divContainer");
+  itemsData.forEach(item => {
+    const div = document.createElement("div");
+    div.id = item.id;
+    div.textContent = item.label;
+    div.className = "draggable-item";
+    // Стандартный Drag & Drop (для десктопа)
+    div.draggable = true;
+    div.ondragstart = drag;
+    divContainer.appendChild(div);
+  });
+
+  // Функция, разрешающая сброс элементов
+  function allowDrop(event) {
+    event.preventDefault();
+  }
+
+  // Запоминаем, какой элемент начал перетаскиваться (HTML5 Drag & Drop)
+  function drag(event) {
+    event.dataTransfer.setData("text", event.target.id);
+  }
+
+  // При отпускании элемента в зону (HTML5 Drag & Drop)
+  function drop(event) {
+    event.preventDefault();
+    const itemId = event.dataTransfer.getData("text");
+    const draggedItem = document.getElementById(itemId);
+    const dropZoneId = event.currentTarget.id; // ID контейнера, куда бросили
+
+    // Добавляем элемент в целевую категорию
+    event.currentTarget.appendChild(draggedItem);
+
+    // Проверяем корректность
+    checkCorrectness(itemId, draggedItem, dropZoneId);
+  }
+
+  // Общая проверка корректности расположения
+  function checkCorrectness(itemId, draggedItem, dropZoneId) {
+    // Найдем объект с данными по itemId
+    const itemData = itemsData.find(item => item.id === itemId);
+
+    // Проверим, правильно ли элемент помещён
+    if (itemData.category === dropZoneId) {
+      // Если до этого блок не был "correct" — увеличим счётчик
+      if (!draggedItem.classList.contains("correct")) {
+        correctCount++;
+      }
+      draggedItem.classList.remove("incorrect");
+      draggedItem.classList.add("correct");
+    } else {
+      // Если раньше блок стоял верно, а теперь нет, уменьшим счётчик
+      if (draggedItem.classList.contains("correct")) {
+        correctCount--;
+      }
+      draggedItem.classList.remove("correct");
+      draggedItem.classList.add("incorrect");
+    }
+
+    // Если все элементы на своих местах — показываем сообщение
+    if (correctCount === totalItems) {
+      const messageElem = document.getElementById("message-classification");
+      messageElem.style.display = "block"; // Делаем <p> видимым
+    }
+  }
+
+
+  // ========== MOBILE DRAG & DROP (с клонированием) ==========
+
+  // Проверяем, является ли устройство сенсорным
+  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+  if (isTouchDevice) {
+    // Отключаем стандартный HTML5 Drag & Drop для мобильных
+    itemsData.forEach(item => {
+      const elem = document.getElementById(item.id);
+      elem.draggable = false;        // Отключаем HTML5-drag
+      elem.ondragstart = null;      // Снимаем обработчик ondragstart (чтобы не конфликтовал)
+
+      // Вешаем touch-события
+      elem.addEventListener("touchstart", handleTouchStart, { passive: false });
+      elem.addEventListener("touchmove", handleTouchMove, { passive: false });
+      elem.addEventListener("touchend", handleTouchEnd, { passive: false });
+    });
+  }
+
+  let currentClone = null;         // Клон перетаскиваемого элемента
+  let currentCloneId = null;       // id оригинального элемента
+  let offsetX = 0;
+  let offsetY = 0;
+
+  function handleTouchStart(e) {
+    // Отменяем скролл, чтобы не "вылазил" во время перемещения
+    e.preventDefault();
+
+    const touch = e.touches[0];
+    const original = e.currentTarget;
+
+    currentCloneId = original.id;
+
+    // Получаем позицию оригинала и считаем смещение точки тача внутри элемента
+    const rect = original.getBoundingClientRect();
+    offsetX = touch.clientX - rect.left;
+    offsetY = touch.clientY - rect.top;
+
+    // Создаём клон
+    currentClone = original.cloneNode(true);
+    // Добавим стили, чтобы клон был над всеми элементами и перемещался
+    currentClone.style.position = "absolute";
+    currentClone.style.left = rect.left + "px";
+    currentClone.style.top = rect.top + "px";
+    currentClone.style.zIndex = 9999;
+    currentClone.id = original.id + "_clone"; // чтобы у клона был уникальный id
+
+    // Добавляем клон в body
+    document.body.appendChild(currentClone);
+  }
+
+  function handleTouchMove(e) {
+    e.preventDefault();
+    if (!currentClone) return;
+
+    const touch = e.touches[0];
+    // Передвигаем клон за пальцем
+    currentClone.style.left = (touch.clientX - offsetX) + "px";
+    currentClone.style.top = (touch.clientY - offsetY) + "px";
+  }
+
+  function handleTouchEnd(e) {
+    e.preventDefault();
+    if (!currentClone) return;
+
+    // Получаем координаты последнего тача
+    const touch = e.changedTouches[0];
+    const dropElement = document.elementFromPoint(touch.clientX, touch.clientY);
+
+    // Определяем, попали ли в dropzone (проверяем его родителя или сам dropElement)
+    let dropZone = findDropZone(dropElement);
+    
+    // Удаляем клон
+    document.body.removeChild(currentClone);
+    currentClone = null;
+
+    if (dropZone) {
+      // Добавим *оригинал* в эту dropzone (не клон!)
+      dropZone.appendChild(document.getElementById(currentCloneId));
+      // Проверяем корректность
+      checkCorrectness(
+        currentCloneId,
+        document.getElementById(currentCloneId),
+        dropZone.id
+      );
+    }
+
+    currentCloneId = null;
+  }
+
+  // Вспомогательная функция для поиска контейнера dropzone по вложенному элементу
+  function findDropZone(elem) {
+    while (elem) {
+      if (elem.classList && elem.classList.contains("dropzone")) {
+        return elem;
+      }
+      elem = elem.parentNode;
+    }
+    return null;
+  }
+  // ========== MOBILE END ==========
+
+</script>
+</body>
+</html>
